@@ -59,7 +59,7 @@ impl<'a> Lexer<'a> {
             ('/', _) => Ok(self.read_punctuator(Token::Slash)),
             ('0', 'X') | ('0', 'x') => self.read_hex_integer_literal(),
             ('0', ch) if ch.is_octal_digit() => Ok(self.read_octal_integer_literal()),
-            (':', ':') => Ok(self.read_punctuator(Token::PathSeparator)),
+            (':', ':') => Ok(self.read_punctuator_2(Token::PathSeparator)),
             (':', _) => Ok(self.read_punctuator(Token::Colon)),
             (';', _) => Ok(self.read_punctuator(Token::Semicolon)),
             ('<', '=') => Ok(self.read_punctuator_2(Token::Le)),

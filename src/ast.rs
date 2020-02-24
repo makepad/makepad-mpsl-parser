@@ -42,7 +42,7 @@ impl FromInnerAndSpan for FunctionPrototypeWithSpan {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct FunctionPrototype {
-    pub return_type: FullySpecifiedTypeWithSpan,
+    pub return_type: Option<FullySpecifiedTypeWithSpan>,
     pub name: IdentifierWithSpan,
     pub parameters: Vec<ParameterDeclarationWithSpan>,
 }

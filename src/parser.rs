@@ -256,10 +256,13 @@ impl<'a> Parser<'a> {
                 }
                 self.expect_token(Token::RightParen)?;
             }
-            self.expect_token(Token::RightArrow)?;
-            return_type = self.parse_fully_specified_type()?;
+            return_type = if self.accept_token(Token::RightArrow) {
+                Some(self.parse_fully_specified_type()?)
+            } else {
+                None
+            }
         } else {
-            return_type = self.parse_fully_specified_type()?;
+            return_type = Some(self.parse_fully_specified_type()?);
             name = self.expect_map_token(|token| token.to_identifier())?;
             self.expect_token(Token::LeftParen)?;
             if !self.accept_token(Token::RightParen) {
