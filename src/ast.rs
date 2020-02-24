@@ -63,20 +63,22 @@ impl FromInnerAndSpan for DeclarationWithSpan {
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Declaration {
-    FunctionPrototype(FunctionPrototypeWithSpan),
-    Variable {
-        type_: FullySpecifiedTypeWithSpan,
-        init_declarators: Vec<InitDeclarator>,
+    Function {
+        prototype: FunctionPrototypeWithSpan
+    },
+    Let {
+        name: IdentifierWithSpan,
+        type_: Option<FullySpecifiedTypeWithSpan>,
+        initializer: Option<ExpressionWithSpan>,
     },
     Precision {
         precision: PrecisionQualifierWithSpan,
         type_: TypeSpecifierWithSpan,
     },
-    Let {
-        name: IdentifierWithSpan,
-        type_: Option<TypeSpecifierWithSpan>,
-        initializer: Option<ExpressionWithSpan>,
-    }
+    Variable {
+        type_: FullySpecifiedTypeWithSpan,
+        init_declarators: Vec<InitDeclarator>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -230,6 +232,9 @@ pub enum TypeSpecifierNoPrecision {
         name: Option<IdentifierWithSpan>,
         declarations: Vec<StructDeclaration>,
     },
+    Path {
+        names: Vec<IdentifierWithSpan>,
+    },
     TypeIdentifier(TypeIdentifierWithSpan),
 }
 
@@ -267,7 +272,11 @@ pub enum TypeIdentifier {
     Mat4,
     Sampler2D,
     SamplerCube,
-    Identifier,
+}
+
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct Path {
+    names: Vec<IdentifierWithSpan>
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]

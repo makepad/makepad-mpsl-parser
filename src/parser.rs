@@ -159,7 +159,6 @@ impl TokenExt for Token {
             Token::Mat4 => Some(TypeIdentifier::Mat4),
             Token::Sampler2D => Some(TypeIdentifier::Sampler2D),
             Token::SamplerCube => Some(TypeIdentifier::SamplerCube),
-            Token::Identifier => Some(TypeIdentifier::Identifier),
             _ => None,
         }
     }
@@ -257,7 +256,7 @@ impl<'a> Parser<'a> {
                 }
                 self.expect_token(Token::RightParen)?;
             }
-            self.expect_token(Token::Arrow)?;
+            self.expect_token(Token::RightArrow)?;
             return_type = self.parse_fully_specified_type()?;
         } else {
             return_type = self.parse_fully_specified_type()?;
@@ -289,23 +288,16 @@ impl<'a> Parser<'a> {
                 let span = this.begin_span();
                 let prototype = this.parse_function_prototype()?;
                 this.expect_token(Token::Semicolon)?;
-                Ok(span.end(this, Declaration::FunctionPrototype(prototype)))
+                Ok(span.end(this, Declaration::Function { prototype }))
             },
             &mut |this| {
                 let span = this.begin_span();
                 match this.peek_token() {
-                    Token::Precision => {
-                        this.skip_token();
-                        let precision = this.expect_map_token(|token| token.to_precision_qualifier())?;
-                        let type_ = this.parse_type_specifier()?;
-                        this.expect_token(Token::Semicolon)?;
-                        Ok(span.end(this, Declaration::Precision { precision, type_ }))
-                    }
                     Token::Let => {
                         this.skip_token();
                         let name = this.expect_map_token(|token| token.to_identifier())?;
                         let type_ = if this.accept_token(Token::Colon) {
-                            Some(this.parse_type_specifier()?)
+                            Some(this.parse_fully_specified_type()?)
                         } else {
                             None
                         };
@@ -320,6 +312,13 @@ impl<'a> Parser<'a> {
                             type_,
                             initializer,
                         }))
+                    }
+                    Token::Precision => {
+                        this.skip_token();
+                        let precision = this.expect_map_token(|token| token.to_precision_qualifier())?;
+                        let type_ = this.parse_type_specifier()?;
+                        this.expect_token(Token::Semicolon)?;
+                        Ok(span.end(this, Declaration::Precision { precision, type_ }))
                     }
                     _ => {
                         let type_ = this.parse_fully_specified_type()?;
@@ -400,6 +399,13 @@ impl<'a> Parser<'a> {
                 }
                 Ok(TypeSpecifierNoPrecision::Struct { name, declarations })
             }
+            Token::Identifier => {
+                let mut names = vec![self.expect_map_token(|token| token.to_identifier())?];
+                while self.accept_token(Token::PathSeparator) {
+                    names.push(self.expect_map_token(|token| token.to_identifier())?);
+                }
+                Ok(TypeSpecifierNoPrecision::Path { names })
+            },
             _ => {
                 let name = self.expect_map_token(|token| token.to_type_identifier())?;
                 Ok(TypeSpecifierNoPrecision::TypeIdentifier(name))
