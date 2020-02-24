@@ -266,30 +266,55 @@ impl<'a> Parser<'a> {
             },
             &mut |this| {
                 let span = this.begin_span();
-                let type_ = this.parse_fully_specified_type()?;
-                let mut init_declarators = vec![];
-                if !this.accept_token(Token::Semicolon) {
-                    loop {
-                        init_declarators.push(this.parse_init_declarator()?);
-                        if !this.accept_token(Token::Comma) {
-                            break;
-                        }
+                match this.peek_token() {
+                    Token::Precision => {
+                        this.skip_token();
+                        let precision = this.expect_map_token(|token| token.to_precision_qualifier())?;
+                        let type_ = this.parse_type_specifier()?;
+                        this.expect_token(Token::Semicolon)?;
+                        Ok(span.end(this, Declaration::Precision { precision, type_ }))
                     }
-                    this.expect_token(Token::Semicolon)?
+                    Token::Let => {
+                        this.skip_token();
+                        let name = this.expect_map_token(|token| token.to_identifier())?;
+                        let type_ = if this.accept_token(Token::Colon) {
+                            Some(this.parse_type_specifier()?)
+                        } else {
+                            None
+                        };
+                        let initializer = if this.accept_token(Token::Eq) {
+                            Some(this.parse_expression()?)
+                        } else {
+                            None
+                        };
+                        this.expect_token(Token::Semicolon)?;
+                        Ok(span.end(this, Declaration::Let {
+                            name,
+                            type_,
+                            initializer,
+                        }))
+                    }
+                    _ => {
+                        let type_ = this.parse_fully_specified_type()?;
+                        let mut init_declarators = vec![];
+                        if !this.accept_token(Token::Semicolon) {
+                            loop {
+                                init_declarators.push(this.parse_init_declarator()?);
+                                if !this.accept_token(Token::Comma) {
+                                    break;
+                                }
+                            }
+                            this.expect_token(Token::Semicolon)?
+                        }
+                        Ok(span.end(
+                            this,
+                            Declaration::Variable {
+                                type_,
+                                init_declarators,
+                            },
+                        ))
+                    }
                 }
-                Ok(span.end(
-                    this,
-                    Declaration::Variable {
-                        type_,
-                        init_declarators,
-                    },
-                ))
-            },
-            &mut |this| {
-                let span = this.begin_span();
-                let precision = this.expect_map_token(|token| token.to_precision_qualifier())?;
-                let type_ = this.parse_type_specifier()?;
-                Ok(span.end(this, Declaration::Precision { precision, type_ }))
             },
         ])
     }

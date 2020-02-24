@@ -154,6 +154,7 @@ impl<'a> Lexer<'a> {
                 "ivec2" => Token::Ivec2,
                 "ivec3" => Token::Ivec3,
                 "ivec4" => Token::Ivec4,
+                "let" => Token::Let,
                 "lowp" => Token::Lowp,
                 "mat2" => Token::Mat2,
                 "mat3" => Token::Mat3,

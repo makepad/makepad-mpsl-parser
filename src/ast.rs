@@ -72,6 +72,11 @@ pub enum Declaration {
         precision: PrecisionQualifierWithSpan,
         type_: TypeSpecifierWithSpan,
     },
+    Let {
+        name: IdentifierWithSpan,
+        type_: Option<TypeSpecifierWithSpan>,
+        initializer: Option<ExpressionWithSpan>,
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]

@@ -75,6 +75,7 @@ pub enum Token {
     Ivec2,
     Ivec3,
     Ivec4,
+    Let,
     Lowp,
     Mat2,
     Mat3,
