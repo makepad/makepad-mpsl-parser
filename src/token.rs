@@ -32,6 +32,7 @@ pub enum Token {
     MinusMinus,
     MinusEq,
     Dot,
+    DotDot,
     Slash,
     SlashEq,
     Colon,

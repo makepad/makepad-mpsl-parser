@@ -23,7 +23,7 @@ impl FromInnerAndSpan for FunctionDefinitionWithSpan {
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct FunctionDefinition {
     pub prototype: FunctionPrototypeWithSpan,
-    pub body: Vec<StatementWithSpan>,
+    pub body: CompoundStatementWithSpan,
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -345,12 +345,20 @@ impl FromInnerAndSpan for StatementWithSpan {
     }
 }
 
+impl From<CompoundStatementWithSpan> for StatementWithSpan {
+    fn from(compound_statement: CompoundStatementWithSpan) -> StatementWithSpan {
+        let span = compound_statement.span;
+        StatementWithSpan {
+            inner: Statement::Compound(compound_statement),
+            span,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub enum Statement {
-    Compound {
-        statements: Vec<StatementWithSpan>,
-    },
-    DeclarationOrExpression(DeclarationOrExpression),
+    Compound(CompoundStatementWithSpan),
+    DeclarationOrExpression(DeclarationOrExpressionStatement),
     If {
         condition: ExpressionWithSpan,
         consequent: Box<StatementWithSpan>,
@@ -365,10 +373,16 @@ pub enum Statement {
         condition: ExpressionWithSpan,
     },
     For {
-        initialization: DeclarationOrExpression,
+        initialization: DeclarationOrExpressionStatement,
         condition: Option<Condition>,
         afterthought: Option<ExpressionWithSpan>,
         body: Box<StatementWithSpan>,
+    },
+    ForIn {
+        name: IdentifierWithSpan,
+        start: ExpressionWithSpan,
+        end: ExpressionWithSpan,
+        body: Box<CompoundStatementWithSpan>,
     },
     Continue,
     Break,
@@ -379,9 +393,47 @@ pub enum Statement {
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
-pub enum DeclarationOrExpression {
+pub struct CompoundStatementWithSpan {
+    inner: CompoundStatement,
+    span: Span,
+}
+
+impl FromInnerAndSpan for CompoundStatementWithSpan {
+    type Inner = CompoundStatement;
+
+    fn from_inner_and_span(inner: CompoundStatement, span: Span) -> CompoundStatementWithSpan {
+        CompoundStatementWithSpan { inner, span }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct CompoundStatement {
+    pub statements: Vec<StatementWithSpan>
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub enum DeclarationOrExpressionStatement {
     Declaration(DeclarationWithSpan),
-    Expression(Option<ExpressionWithSpan>),
+    ExpressionStatement(ExpressionStatementWithSpan),
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct ExpressionStatementWithSpan {
+    inner: ExpressionStatement,
+    span: Span,
+}
+
+impl FromInnerAndSpan for ExpressionStatementWithSpan {
+    type Inner = ExpressionStatement;
+
+    fn from_inner_and_span(inner: ExpressionStatement, span: Span) -> ExpressionStatementWithSpan {
+        ExpressionStatementWithSpan { inner, span }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, PartialOrd)]
+pub struct ExpressionStatement {
+    pub expression: Option<ExpressionWithSpan>
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]

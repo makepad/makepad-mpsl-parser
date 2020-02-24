@@ -51,6 +51,7 @@ impl<'a> Lexer<'a> {
             ('-', '-') => Ok(self.read_punctuator_2(Token::MinusMinus)),
             ('-', '=') => Ok(self.read_punctuator_2(Token::MinusEq)),
             ('-', _) => Ok(self.read_punctuator(Token::Minus)),
+            ('.', '.') => Ok(self.read_punctuator_2(Token::DotDot)),
             ('.', ch) if ch.is_decimal_digit() => self.read_decimal_literal(),
             ('.', _) => Ok(self.read_punctuator(Token::Dot)),
             ('/', '=') => Ok(self.read_punctuator_2(Token::SlashEq)),

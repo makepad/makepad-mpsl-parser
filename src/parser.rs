@@ -227,11 +227,7 @@ impl<'a> Parser<'a> {
 
     fn parse_function_definition(&mut self) -> Result<FunctionDefinition> {
         let prototype = self.parse_function_prototype()?;
-        self.expect_token(Token::LeftBrace)?;
-        let mut body = vec![];
-        while !self.accept_token(Token::RightBrace) {
-            body.push(self.parse_statement()?);
-        }
+        let body = self.parse_compound_statement()?;
         Ok(FunctionDefinition { prototype, body })
     }
 
@@ -408,24 +404,32 @@ impl<'a> Parser<'a> {
         let span = self.begin_span();
         match self.peek_token() {
             Token::LeftBrace => {
-                self.expect_token(Token::LeftBrace)?;
-                let mut statements = vec![];
-                while !self.accept_token(Token::RightBrace) {
-                    statements.push(self.parse_statement()?);
-                }
-                Ok(span.end(self, Statement::Compound { statements }))
+                let compound_statement = self.parse_compound_statement()?;
+                Ok(span.end(self, Statement::Compound(compound_statement)))
             }
             Token::If => {
                 self.expect_token(Token::If)?;
-                self.expect_token(Token::LeftParen)?;
-                let condition = self.parse_expression()?;
-                self.expect_token(Token::RightParen)?;
-                let consequent = Box::new(self.parse_statement()?);
-                let alternative = if self.accept_token(Token::Else) {
-                    Some(Box::new(self.parse_statement()?))
+                let condition;
+                let consequent;
+                let alternative;
+                if self.accept_token(Token::LeftParen) {
+                    condition = self.parse_expression()?;
+                    self.expect_token(Token::RightParen)?;
+                    consequent = Box::new(self.parse_statement()?);
+                    alternative = if self.accept_token(Token::Else) {
+                        Some(Box::new(self.parse_statement()?))
+                    } else {
+                        None
+                    };
                 } else {
-                    None
-                };
+                    condition = self.parse_expression()?;
+                    consequent = Box::new(self.parse_compound_statement()?.into());
+                    alternative = if self.accept_token(Token::Else) {
+                        Some(Box::new(self.parse_compound_statement()?.into()))
+                    } else {
+                        None
+                    };
+                }
                 Ok(span.end(
                     self,
                     Statement::If {
@@ -437,10 +441,16 @@ impl<'a> Parser<'a> {
             }
             Token::While => {
                 self.expect_token(Token::While)?;
-                self.expect_token(Token::LeftParen)?;
-                let condition = self.parse_condition()?;
-                self.expect_token(Token::RightParen)?;
-                let body = Box::new(self.parse_statement()?);
+                let condition;
+                let body;
+                if self.accept_token(Token::LeftParen) {
+                    condition = self.parse_condition()?;
+                    self.expect_token(Token::RightParen)?;
+                    body = Box::new(self.parse_statement()?);
+                } else {
+                    condition = self.parse_condition()?;
+                    body = Box::new(self.parse_compound_statement()?.into());
+                }
                 Ok(span.end(self, Statement::While { condition, body }))
             }
             Token::Do => {
@@ -455,32 +465,48 @@ impl<'a> Parser<'a> {
             }
             Token::For => {
                 self.expect_token(Token::For)?;
-                self.expect_token(Token::LeftParen)?;
-                let initialization = self.parse_declaration_or_expression()?;
-                let condition = if !self.accept_token(Token::Semicolon) {
-                    let condition = self.parse_condition()?;
-                    self.expect_token(Token::Semicolon)?;
-                    Some(condition)
+                if self.accept_token(Token::LeftParen) {
+                    let initialization = self.parse_declaration_or_expression_statement()?;
+                    let condition = if !self.accept_token(Token::Semicolon) {
+                        let condition = self.parse_condition()?;
+                        self.expect_token(Token::Semicolon)?;
+                        Some(condition)
+                    } else {
+                        None
+                    };
+                    let afterthought = if !self.accept_token(Token::RightParen) {
+                        let afterthought = self.parse_expression()?;
+                        self.expect_token(Token::RightParen)?;
+                        Some(afterthought)
+                    } else {
+                        None
+                    };
+                    let body = Box::new(self.parse_statement()?);
+                    Ok(span.end(
+                        self,
+                        Statement::For {
+                            initialization,
+                            condition,
+                            afterthought,
+                            body,
+                        },
+                    ))
                 } else {
-                    None
-                };
-                let afterthought = if !self.accept_token(Token::RightParen) {
-                    let afterthought = self.parse_expression()?;
-                    self.expect_token(Token::RightParen)?;
-                    Some(afterthought)
-                } else {
-                    None
-                };
-                let body = Box::new(self.parse_statement()?);
-                Ok(span.end(
-                    self,
-                    Statement::For {
-                        initialization,
-                        condition,
-                        afterthought,
-                        body,
-                    },
-                ))
+                    let name = self.expect_map_token(|token| token.to_identifier())?;
+                    let start = self.parse_expression()?;
+                    self.expect_token(Token::DotDot)?;
+                    let end = self.parse_expression()?;
+                    let body = Box::new(self.parse_compound_statement()?);
+                    Ok(span.end(
+                        self,
+                        Statement::ForIn {
+                            name,
+                            start,
+                            end,
+                            body,
+                        }
+                    ))
+                }
             }
             Token::Continue => {
                 self.expect_token(Token::Continue)?;
@@ -509,33 +535,50 @@ impl<'a> Parser<'a> {
                 Ok(span.end(self, Statement::Discard))
             }
             _ => {
-                let declaration_or_expression = self.parse_declaration_or_expression()?;
+                let declaration_or_expression_statement = self.parse_declaration_or_expression_statement()?;
                 Ok(span.end(
                     self,
-                    Statement::DeclarationOrExpression(declaration_or_expression),
+                    Statement::DeclarationOrExpression(declaration_or_expression_statement),
                 ))
             }
         }
     }
 
-    fn parse_declaration_or_expression(&mut self) -> Result<DeclarationOrExpression> {
+    fn parse_compound_statement(&mut self) -> Result<CompoundStatementWithSpan> {
+        let span = self.begin_span();
+        self.expect_token(Token::LeftBrace)?;
+        let mut statements = vec![];
+        while !self.accept_token(Token::RightBrace) {
+            statements.push(self.parse_statement()?);
+        }
+        Ok(span.end(self, CompoundStatement { statements }))
+    }
+
+    fn parse_declaration_or_expression_statement(&mut self) -> Result<DeclarationOrExpressionStatement> {
         self.parse_alternatives(&mut [
             &mut |this| {
-                Ok(DeclarationOrExpression::Declaration(
+                Ok(DeclarationOrExpressionStatement::Declaration(
                     this.parse_declaration()?,
                 ))
             },
             &mut |this| {
-                let expression = if !this.accept_token(Token::Semicolon) {
-                    let expression = this.parse_expression()?;
-                    this.expect_token(Token::Semicolon)?;
-                    Some(expression)
-                } else {
-                    None
-                };
-                Ok(DeclarationOrExpression::Expression(expression))
+                Ok(DeclarationOrExpressionStatement::ExpressionStatement(this.parse_expression_statement()?))
             },
         ])
+    }
+
+    fn parse_expression_statement(&mut self) -> Result<ExpressionStatementWithSpan> {
+        let span = self.begin_span();
+        let expression = if !self.accept_token(Token::Semicolon) {
+            let expression = self.parse_expression()?;
+            self.expect_token(Token::Semicolon)?;
+            Some(expression)
+        } else {
+            None
+        };
+        Ok(span.end(self, ExpressionStatement {
+            expression
+        }))
     }
 
     fn parse_condition(&mut self) -> Result<Condition> {
