@@ -233,18 +233,45 @@ impl<'a> Parser<'a> {
 
     fn parse_function_prototype(&mut self) -> Result<FunctionPrototypeWithSpan> {
         let span = self.begin_span();
-        let return_type = self.parse_fully_specified_type()?;
-        let name = self.expect_map_token(|token| token.to_identifier())?;
-        self.expect_token(Token::LeftParen)?;
+        let return_type;
+        let name;
         let mut parameters = vec![];
-        if !self.accept_token(Token::RightParen) {
-            loop {
-                parameters.push(self.parse_parameter_declaration()?);
-                if !self.accept_token(Token::Comma) {
-                    break;
+        if self.accept_token(Token::Fn) {
+            name = self.expect_map_token(|token| token.to_identifier())?;
+            self.expect_token(Token::LeftParen)?;
+            if !self.accept_token(Token::RightParen) {
+                loop {
+                    let span = self.begin_span();
+                    let qualifier = self.accept_map_token(|token| token.to_parameter_qualifier());
+                    let name: IdentifierWithSpan = self.expect_map_token(|token| token.to_identifier())?;
+                    self.expect_token(Token::Colon)?;
+                    let type_ = self.parse_type_specifier()?;
+                    parameters.push(span.end(self, ParameterDeclaration {
+                        qualifier,
+                        type_,
+                        declarator: Some(name.into()),
+                    }));
+                    if !self.accept_token(Token::Comma) {
+                        break;
+                    }
                 }
+                self.expect_token(Token::RightParen)?;
             }
-            self.expect_token(Token::RightParen)?;
+            self.expect_token(Token::Arrow)?;
+            return_type = self.parse_fully_specified_type()?;
+        } else {
+            return_type = self.parse_fully_specified_type()?;
+            name = self.expect_map_token(|token| token.to_identifier())?;
+            self.expect_token(Token::LeftParen)?;
+            if !self.accept_token(Token::RightParen) {
+                loop {
+                    parameters.push(self.parse_parameter_declaration()?);
+                    if !self.accept_token(Token::Comma) {
+                        break;
+                    }
+                }
+                self.expect_token(Token::RightParen)?;
+            }
         }
         Ok(span.end(
             self,

@@ -310,6 +310,19 @@ impl FromInnerAndSpan for DeclaratorWithSpan {
     }
 }
 
+impl From<IdentifierWithSpan> for DeclaratorWithSpan {
+    fn from(name: IdentifierWithSpan) -> DeclaratorWithSpan {
+        let span = name.span;
+        DeclaratorWithSpan {
+            inner: Declarator {
+                name,
+                length: None
+            },
+            span,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
 pub struct Declarator {
     pub name: IdentifierWithSpan,
